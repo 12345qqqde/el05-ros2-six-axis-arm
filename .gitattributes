@@ -1,0 +1,10 @@
+# 统一使用 LF：ROS 侧的 .sh / .py 要在 Ubuntu(WSL) 里执行，CRLF 会让脚本报坏解释器
+* text=auto eol=lf
+
+# 二进制资源不要做换行/文本处理
+*.png binary
+*.jpg binary
+*.STL binary
+*.stl binary
+*.npy binary
+*.pdf binary
