@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 import yaml
 from ament_index_python.packages import get_package_share_directory
@@ -6,7 +7,57 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
+from launch import Substitution
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.actions import Node
+
+
+def _detect_iface():
+    """直接在 launch 里探测：哪条 can 接口能应答 21 号电机"""
+    import glob
+    import socket
+    import struct
+    import time
+
+    for name in sorted(os.path.basename(x) for x in glob.glob("/sys/class/net/can*")):
+        try:
+            s = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
+            s.bind((name,))
+            s.settimeout(0.02)
+        except OSError:
+            continue
+        try:
+            s.send(struct.pack("=IB3x8s", (0x11 << 24) | (0xFD << 8) | 21 | 0x80000000,
+                               8, struct.pack("<H", 0x7019) + b"\x00" * 6))
+            t_end = time.monotonic() + 0.15
+            while time.monotonic() < t_end:
+                try:
+                    fr = s.recv(16)
+                except socket.timeout:
+                    continue
+                if len(fr) < 16:
+                    continue
+                cid, _ = struct.unpack("=IB", fr[:5])
+                c = cid & 0x1FFFFFFF
+                if ((c >> 24) & 0x1F) == 0x11 and ((c >> 8) & 0xFF) == 21:
+                    return name
+        except OSError:
+            pass
+        finally:
+            s.close()
+    return "can0"
+
+
+class AutoIface(Substitution):
+    """can_interface 传 auto（或留空）时，启动那一刻自动检测"""
+
+    def perform(self, context):
+        val = LaunchConfiguration("can_interface").perform(context)
+        if val and val != "auto":
+            return val
+        iface = _detect_iface()
+        print("[launch] 自动检测到电机在 %s" % iface)
+        return iface
 
 
 def generate_launch_description():
@@ -51,7 +102,8 @@ def generate_launch_description():
             DeclareLaunchArgument("gui", default_value="true", description="滑块窗口"),
             DeclareLaunchArgument("servo", default_value="true",
                                   description="启动真机伺服（默认开，但还要 /arm/enable=true 才动）"),
-            DeclareLaunchArgument("can_interface", default_value="can0"),
+            DeclareLaunchArgument("can_interface", default_value="auto",
+                                  description="auto = 自动检测电机在哪条总线"),
             DeclareLaunchArgument("max_speed", default_value="0.3",
                                   description="目标斜坡速度 rad/s，滑块猛拉也不会一步到位"),
             DeclareLaunchArgument("limit_cur", default_value="6.0",
@@ -88,7 +140,7 @@ def generate_launch_description():
                 parameters=[
                     servo_params,
                     {
-                        "can_interface": can_iface,
+                        "can_interface": ParameterValue(AutoIface(), value_type=str),
                         "max_speed": max_speed,
                         "control_rate_hz": 50.0,
                         "speed_limit": 0.5,

@@ -2,6 +2,8 @@
 
 EL05（RobStride 准直驱电机）六轴机械臂的完整工程：SolidWorks 导出的 URDF/RViz 描述、正逆运动学与工作空间分析、真机 CAN 伺服、标定工具，以及接到上位机（hand-host）的集成包。
 
+> **代码来源**：`ros2_arm_ws/` 与 `el05_serial_ws/` 的实现由 **Raki（亲均灿）** 编写（3433253304@qq.com），原始仓库 [Rakiv-dsh/arm-urdf](https://github.com/Rakiv-dsh/arm-urdf)。2026-11-06 按 2026-11-02 版本并入本仓库，仅做目录改名，未改源码。详见 [CREDITS.md](CREDITS.md)。
+
 - 机械结构：6 个关节，其中 joint1~joint5 有电机（CAN ID 21~25），joint6 无电机（从动，只做运动学占位）
 - 通信：SocketCAN（USB-CANHUB / candleLight，1 Mbps，EL05 私有协议，CAN 扩展帧）
 - ROS 版本：ROS 2 Jazzy（Ubuntu 24.04 / WSL2）
